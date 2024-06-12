@@ -1,0 +1,27 @@
+---
+version: '3.8'
+name: "kafbat-ui-keycloak"
+
+services:
+
+  kafbat-ui:
+    container_name: kafbat-ui
+    image: ghcr.io/kafbat/kafka-ui:latest
+    network_mode: host  # WON'T WORK ON MACOS UNLESS ORBSTACK IS USED
+    environment:
+      SPRING_CONFIG_ADDITIONAL-LOCATION: /config.yml
+    volumes:
+      - ./config.yml:/config.yml # BEWARE, this might need to be an absolute path instead
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.0
+    network_mode: host # WON'T WORK ON MACOS UNLESS ORBSTACK IS USED
+    ports:
+      - 8081:8080
+      - 8082:8443 #ssl
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - /tmp/keycloak:/opt/keycloak/data/ # don't forget to save it somewhere, not in /tmp
