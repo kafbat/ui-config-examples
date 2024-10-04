@@ -32,6 +32,14 @@ DEBUG [reactor-http-nio-6] i.k.u.s.r.e.OauthAuthorityExtractor: Token's groups: 
 DEBUG [reactor-http-nio-6] i.k.u.s.r.e.OauthAuthorityExtractor: Matched group roles: [admins]
 ```
 
+If it didn't work, you can expand logging this way:
+```
+logging:
+  level:
+    io.kafbat.ui.service.rbac.extractor: TRACE
+```
+This will yield additional log messages.
+
 User info is also available at http://localhost:9090/api/authorization endpoint.
 
 Voilà!
