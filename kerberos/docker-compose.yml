@@ -1,0 +1,199 @@
+---
+version: '3.5'
+services:
+  kerberos: 
+        image: jairsjunior/kerberos-docker:0.0.4
+        hostname: kerberos
+        container_name: kerberos
+        environment: 
+            - REALM=KERBEROS
+            - DOMAIN_REALM=kerberos
+            - KERB_MASTER_KEY=masterkey
+            - KERB_ADMIN_USER=admin
+            - KERB_ADMIN_PASS=admin
+            - SEARCH_DOMAINS=search.consul kerberos
+        volumes: 
+            - ./kerberos-data:/volumes/kerberos
+            - ./kerberos-keytabs:/volumes/keytabs
+            - ./kerberos-users:/volumes/users
+
+  kafka-ui.kerberos:
+    hostname: kafka-ui.kerberos
+    container_name: kafka-ui.kerberos
+    image: provectuslabs/kafka-ui:v0.5.0
+    ports:
+      - 8080:8080
+    depends_on:
+      - broker.kerberos
+      - schema-registry.kerberos
+      #- kafka-connect0
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: SASL_PLAINTEXT://broker.kerberos:9093
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry.kerberos:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: first
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_KERBEROS_SERVICE_NAME: 'kafka'
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: GSSAPI
+      KAFKA_CLUSTERS_0_PROPERTIES_KERBEROS_SERVICE_NAME: kafka
+      KAFKA_CLUSTERS_0_PROPERTIES_KERBEROS_PARAMS:  -Djava.security.auth.login.config=/home/kafkaui/kafka_ui_jaas.conf -Djava.security.krb5.conf=/home/kafkaui/krb5.conf -Dsun.security.krb5.debug=true
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'com.sun.security.auth.module.Krb5LoginModule required useTicketCache=false;'
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: 'SASL_PLAINTEXT'
+      JAVA_OPTS: -Djava.security.auth.login.config=/home/kafkaui/kafka_ui_jaas.conf -Djava.security.krb5.conf=/home/kafkaui/krb5.conf -Dsun.security.krb5.debug=true
+      #JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka-ui.kerberos -Dcom.sun.management.jmxremote.rmi.port=9997 -Djava.security.auth.login.config=/etc/kafka-ui/kafka_ui_jaas.conf -Djava.security.krb5.conf=/etc/kafka-ui/krb5.conf
+      #CUB_CLASSPATH: /etc/confluent/docker/docker-utils.jar:/usr/share/java/kafka-ui/krb5loginmodule-wrapper-0.0.1.jar -Djava.security.auth.login.config=/etc/kafka-ui/kafka_ui_jaas.conf -Djava.security.krb5.conf=/etc/kafka-ui/krb5.conf
+    volumes:
+            - ./kafka-jaas/kafka_ui_jaas.conf:/home/kafkaui/kafka_ui_jaas.conf
+            - ./kerberos-data/krb5.conf:/home/kafkaui/krb5.conf
+            - ./kerberos-keytabs/kafka-ui.kerberos.keytab:/home/kafkaui/kafka-ui.kerberos.keytab
+            - ./kafka-jaas/producer.properties:/home/kafkaui/producer.properties
+            - ./kafka-jaas/consumer.properties:/home/kafkaui/consumer.properties
+            - ./libs/krb5loginmodule-wrapper-0.0.1.jar:/usr/share/java/kafka-ui/krb5loginmodule-wrapper-0.0.1.jar
+  
+      #KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect.kerberos:8083
+      #KAFKA_CLUSTERS_0_KSQLDBSERVER: http://ksqldb:8088
+
+  broker.kerberos:
+    depends_on:
+      - kerberos
+    image: confluentinc/cp-kafka:7.2.1
+    hostname: broker.kerberos.kerberos.kafka-kerberos_default
+    container_name: broker.kerberos
+    ports:
+      - "9093:9093"
+      - "9092:9092"
+      - "9997:9997"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker.kerberos:29092,PLAINTEXT_HOST://localhost:9092,SASL_PLAINTEXT://broker.kerberos:9093'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=broker.kerberos.kerberos.kafka-kerberos_default -Dcom.sun.management.jmxremote.rmi.port=9997
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf -Djava.security.krb5.conf=/etc/kafka/krb5.conf "
+      KAFKA_NODE_ID: 1
+      KAFKA_SASL_KERBEROS_SERVICE_NAME: kafka
+      KAFKA_SASL_ENABLED_MECHANISMS: GSSAPI
+      KAFKA_LOG_RETENTION_MS: 259200000
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker.kerberos:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://broker.kerberos:29092,CONTROLLER://broker.kerberos:29093,PLAINTEXT_HOST://0.0.0.0:9092,SASL_PLAINTEXT://broker.kerberos:9093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    volumes:
+      - ./update_run.sh:/tmp/update_run.sh
+      - ./kafka-jaas/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+      - ./kerberos-keytabs/broker.kerberos.kafka-kerberos_default.keytab:/etc/security/keytabs/broker.kerberos.kafka-kerberos_default.keytab
+      - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
+    command: "bash -c 'if [ ! -f /tmp/update_run.sh ]; then echo \"ERROR: Did you forget the update_run.sh file that came with this docker-compose.yml file?\" && exit 1 ; else /tmp/update_run.sh && /etc/confluent/docker/run ; fi'"
+
+  schema-registry.kerberos:
+    image: confluentinc/cp-schema-registry:5.3.1
+    ports:
+      - 8081:8081
+    depends_on:
+      - broker.kerberos
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry.kerberos
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry.kerberos:8081
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: "http"
+      SCHEMA_REGISTRY_LOG4J_ROOT_LOGLEVEL: DEBUG
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry.kerberos
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://broker.kerberos:9093
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_KERBEROS_SERVICE_NAME: kafka
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: GSSAPI
+      SCHEMA_REGISTRY_JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=49999 -Djava.security.auth.login.config=/etc/schema-registry/kafka_schema_registry_jaas.conf -Djava.security.krb5.conf=/etc/schema-registry/krb5.conf
+      CUB_CLASSPATH: /etc/confluent/docker/docker-utils.jar:/usr/share/java/schema-registry/krb5loginmodule-wrapper-0.0.1.jar -Djava.security.auth.login.config=/etc/schema-registry/kafka_schema_registry_jaas.conf -Djava.security.krb5.conf=/etc/schema-registry/krb5.conf
+    volumes:
+            - ./kafka-jaas/kafka_schema_registry_jaas.conf:/etc/schema-registry/kafka_schema_registry_jaas.conf
+            - ./kerberos-data/krb5.conf:/etc/schema-registry/krb5.conf
+            - ./libs/krb5loginmodule-wrapper-0.0.1.jar:/usr/share/java/schema-registry/krb5loginmodule-wrapper-0.0.1.jar
+
+  ##kafka-connect0:
+  ##  build:
+  ##    context: ./kafka-connect
+  ##    args:
+  ##      image: confluentinc/cp-kafka-connect:6.0.1
+  ##  ports:
+  ##    - 8083:8083
+  ##  depends_on:
+  ##    - broker.kerberos
+  ##    - schema-registry.kerberos
+  ##  environment:
+  ##    CONNECT_BOOTSTRAP_SERVERS: broker.kerberos:29092
+  ##    CONNECT_GROUP_ID: compose-connect-group
+  ##    CONNECT_CONFIG_STORAGE_TOPIC: _connect_configs
+  ##    CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+  ##    CONNECT_OFFSET_STORAGE_TOPIC: _connect_offset
+  ##    CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+  ##    CONNECT_STATUS_STORAGE_TOPIC: _connect_status
+  ##    CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+  ##    CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+  ##    CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry.kerberos:8081
+  ##    CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+  ##    CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry.kerberos:8081
+  ##    CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+  ##    CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+  ##    CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect0
+  ##    CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+#      AWS_ACCESS_KEY_ID: ""
+#      AWS_SECRET_ACCESS_KEY: ""
+##
+  ##kafka-init-topics:
+  ##  image: confluentinc/cp-kafka:7.2.1
+  ##  volumes:
+  ##    - ./message.json:/data/message.json
+  ##  depends_on:
+  ##    - broker.kerberos
+  ##  command: "bash -c 'echo Waiting for Kafka to be ready... && \
+  ##             cub kafka-ready -b broker.kerberos:29092 1 30 && \
+  ##             kafka-topics --create --topic users --partitions 3 --replication-factor 1 --if-not-exists --bootstrap-server broker.kerberos:29092 && \
+  ##             kafka-topics --create --topic messages --partitions 2 --replication-factor 1 --if-not-exists --bootstrap-server broker.kerberos:29092 && \
+  ##             kafka-console-producer --bootstrap-server broker.kerberos:29092 --topic users < /data/message.json'"
+##
+  ##postgres-db:
+  ##  build:
+  ##    context: ./postgres
+  ##    args:
+  ##      image: postgres:9.6.22
+  ##  ports:
+  ##    - 5432:5432
+  ##  environment:
+  ##    POSTGRES_USER: 'dev_user'
+  ##    POSTGRES_PASSWORD: '12345'
+##
+  ##create-connectors:
+  ##  image: ellerbrock/alpine-bash-curl-ssl
+  ##  depends_on:
+  ##    - postgres-db
+  ##    - kafka-connect0
+  ##  volumes:
+  ##    - ./connectors:/connectors
+  ##  command: bash -c '/connectors/start.sh'
+##
+  ####ksqldb:
+  ####  image: confluentinc/ksqldb-server:0.18.0
+  ##  depends_on:
+  ##    - broker.kerberos
+  ##    - kafka-connect0
+  ##    - schema-registry.kerberos
+  ##  ports:
+  ##    - 8088:8088
+  ##  environment:
+  ##    KSQL_CUB_KAFKA_TIMEOUT: 120
+  ##    KSQL_LISTENERS: http://0.0.0.0:8088
+  ##    KSQL_BOOTSTRAP_SERVERS: PLAINTEXT://broker.kerberos:29092
+  ##    KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+  ##    KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+  ##    KSQL_KSQL_CONNECT_URL: http://kafka-connect0:8083
+  ##    KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry.kerberos:8081
+  ##    KSQL_KSQL_SERVICE_ID: my_ksql_1
+  ##    KSQL_KSQL_HIDDEN_TOPICS: '^_.*'
+  ##    KSQL_CACHE_MAX_BYTES_BUFFERING: 0

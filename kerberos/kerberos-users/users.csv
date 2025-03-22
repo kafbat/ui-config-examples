@@ -1,0 +1,6 @@
+kafka,broker.kerberos.kafka-kerberos_default,broker.kerberos.kafka-kerberos_default
+kafka,zookeeper.kerberos,client1.kerberos
+kafka,schema-registry,schema-registry.kerberos,schema1234
+kafka,rest-proxy,kafka_rest-proxy,rest1234
+kafka,kafka2influx,kafka_kafka2influx,influx1234
+kafka,kafka-ui.kerberos,kafka-ui.kerberos
