@@ -1,0 +1,90 @@
+yamlApplicationConfig:
+  logging:
+    level:
+      io.kafbat.ui.service.rbac.extractor: TRACE
+      io.kafbat.ui: TRACE
+
+  auth:
+    type: OAUTH2
+    oauth2:
+      client:
+        azure:
+          clientId: ${CLIENT_ID}
+          clientSecret: ${CLIENT_SECRET}
+          scope: openid
+          client-name: AzureAD
+          provider: azure
+          redirect-uri: "https://${kafbat-ui-fqdn}/login/oauth2/code/azure"
+          authorization-grant-type: authorization_code
+          issuer-uri: "https://login.microsoftonline.com/${Tenant_ID}/v2.0"
+          jwk-set-uri: "https://login.microsoftonline.com/${Tenant_ID}/discovery/v2.0/keys"
+          user-name-attribute: email
+          custom-params:
+            type: oauth
+            roles-field: roles
+
+
+  rbac:
+    roles:
+      - name: admin
+        clusters: 
+          - cluster1
+        subjects:
+          - provider: oauth
+            type: role
+            value: admin
+        permissions:
+          - resource: applicationconfig
+            value: ".*"
+            actions: all
+          - resource: clusterconfig
+            value: ".*"
+            actions: all
+          - resource: topic
+            value: ".*"
+            actions: all
+          - resource: consumer
+            value: ".*"
+            actions: all
+          - resource: schema
+            value: ".*"
+            actions: all
+          - resource: connect
+            value: ".*"
+            actions: all
+          - resource: ksql
+            actions: all
+          - resource: acl
+            actions: all
+          - resource: audit
+            actions: all
+      - name: readonly
+        clusters: 
+          - cluster1
+        subjects:
+          - provider: oauth
+            type: role
+            value: read
+        permissions:
+          - resource: applicationconfig
+            value: ".*"
+            actions: [ view ]
+          - resource: clusterconfig
+            value: ".*"
+            actions: [ view ]
+          - resource: topic
+            value: ".*"
+            actions: [ view ]
+          - resource: consumer
+            value: ".*"
+            actions: [ view ]
+          - resource: schema
+            value: ".*"
+            actions: [ view ]
+          - resource: connect
+            value: ".*"
+            actions: [ view ]
+          - resource: acl
+            actions: [ view ]
+          - resource: audit
+            actions: [ view ]
